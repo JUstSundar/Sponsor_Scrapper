@@ -85,6 +85,34 @@ def find_logo_local_tier(img):
 
     return None
 
+MAX_TIER_LENGTH = 60  # characters
+MAX_TIER_WORDS = 8    # words
+
+def sanitize_tier(text: str) -> str | None:
+    if not text:
+        return None
+
+    text = text.strip()
+
+    # Too long → reject
+    if len(text) > MAX_TIER_LENGTH:
+        return None
+
+    words = text.split()
+
+    # Too many words → reject
+    if len(words) > MAX_TIER_WORDS:
+        return None
+
+    # Must contain at least one PORTFOLIO keyword
+    if not any(k in text.lower() for k in PORTFOLIO_KEYWORDS):
+        return None
+
+    # Remove trailing punctuation
+    text = re.sub(r"[.,;:]+$", "", text)
+
+    return text
+
 def determine_tier(img, group_tier):
     # Highest priority: logo-local tier
     local_tier = find_logo_local_tier(img)

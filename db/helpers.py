@@ -51,28 +51,35 @@ def get_or_create_company(db, name):
     db.flush()
     return company
 
-def get_or_create_sponsorship(db: Session, fest_id: int, company_id: int, group_name: str | None,
-    confidence: float | None):
-    
+def get_or_create_sponsorship(db, fest_id, company_id, group_name, confidence):
     sponsorship = db.query(Sponsorship).filter(
         Sponsorship.fest_id == fest_id,
-        Sponsorship.company_id == company_id
+        Sponsorship.company_id == company_id,
     ).first()
 
     if sponsorship:
-            # enrich if better data arrives
-            if not sponsorship.tier and group_name:
-                sponsorship.tier = group_name
-            if confidence and (sponsorship.confidence or 0) < confidence:
-                sponsorship.confidence = confidence
-            return sponsorship
+        updated = False
+
+        if group_name and not sponsorship.tier:
+            sponsorship.tier = group_name
+            updated = True
+
+        if confidence and (sponsorship.confidence is None or confidence > sponsorship.confidence):
+            sponsorship.confidence = confidence
+            updated = True
+
+        if updated:
+            db.flush()
+
+        return sponsorship
 
     sponsorship = Sponsorship(
-            fest_id=fest_id,
-            company_id=company_id,
-            tier=group_name,          # using tier column for now
-            confidence=confidence,
-        )
+        fest_id=fest_id,
+        company_id=company_id,
+        tier=group_name,
+        confidence=confidence,
+    )
+
     db.add(sponsorship)
     db.flush()
     return sponsorship

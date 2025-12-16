@@ -79,7 +79,7 @@ def run_fest_scrape(
                 db=db,
                 fest_id=fest.id,
                 company_id=company.id,
-                group_name=s.get("tier") or s.get("group") or "sponsor",
+                group_name=s.get("tier"),
                 confidence=s["confidence"],
             )
 
@@ -90,6 +90,8 @@ def run_fest_scrape(
         print(f"Inserted {len(sponsors)} sponsors.")
 
     except Exception as e:
+        print(f"Error during fest scrape: {e}")
+        print("Rolling back DB session.")
         db.rollback()
         raise e
 

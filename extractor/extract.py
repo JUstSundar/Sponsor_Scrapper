@@ -1,69 +1,37 @@
 from bs4 import BeautifulSoup
-import requests
 import re
 import os
-from urllib.parse import urlparse, urljoin 
-from extractor.tiers import contains_tier_word, find_closest_tier_header, determine_tier
+from urllib.parse import urlparse, urljoin
 
-def find_sponsor_groups(html):
-    """
-    Find repeating DOM blocks that likely represent sponsor groups.
-    """
-    soup = BeautifulSoup(html, "lxml")
-    groups = []
+from extractor.tiers import sanitize_tier  
 
-    # Look for containers with multiple images (logos)
-    for container in soup.find_all(["div", "section"]):
-        images = container.find_all("img") 
-        if len(images)<1:
-            continue
+GENERIC_NAMES = {
+    "logo", "sponsor", "sponsor logo",
+    "partner", "image", "img",
+    "mood indigo logo"
+}
 
-        # Ignore very large containers (entire page) -> might be reason if more text, less images 
-        text_len = len(container.get_text(strip=True))
-        if text_len > 2000:
-            continue
 
-        groups.append(container)
-
-    return groups
-
-#optional if we find out the closest tier header
-def extract_group_label(container):
-    """
-    Extract portfolio/category name near a sponsor group.
-    """
-    # Check headers inside container
-    for tag in container.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
-        text = tag.get_text(strip=True)
-        if 2 <= len(text.split()) <= 6:
-            return text
-
-    # Check immediate previous siblings
-    prev = container.find_previous_sibling()
-    if prev:
-        text = prev.get_text(strip=True)
-        if 2 <= len(text.split()) <= 6:
-            return text
-
-    return None  # group exists, label unclear
+# ----------------------------
+# 1️⃣ BRAND NAME RESOLUTION
+# ----------------------------
 
 def resolve_brand_name(img, base_url):
-    """
-    Resolve brand name using multiple weak signals.
-    Priority:
-    alt > link domain > filename
-    """
     # 1. alt text
     alt = img.get("alt")
-    if alt and len(alt.strip()) > 2:
-        return alt.strip(), 0.9
+    if alt:
+        alt_clean = alt.strip().lower()
+        if alt_clean not in GENERIC_NAMES and len(alt_clean) > 3:
+            return alt.strip(), 0.9
 
     # 2. parent link domain
     parent_link = img.find_parent("a")
     if parent_link and parent_link.get("href"):
         domain = urlparse(parent_link["href"]).netloc
         if domain:
-            return domain.replace("www.", "").split(".")[0], 0.75
+            brand = domain.replace("www.", "").split(".")[0]
+            if len(brand) > 2:
+                return brand, 0.85
 
     # 3. image filename
     src = img.get("src")
@@ -76,57 +44,145 @@ def resolve_brand_name(img, base_url):
 
     return None, 0.0
 
-#main extraction - tier detection
-def extract_sponsors_from_group(container, base_url, group_name=None):
+
+# ----------------------------
+# 2️⃣ LOGO EXTRACTION (GLOBAL)
+# ----------------------------
+
+def extract_all_logos(soup, base_url):
+    logos = []
+
+    for img in soup.find_all("img"):
+        src = img.get("src")
+        if not src:
+            continue
+
+        src = urljoin(base_url, src)
+
+        # filter obvious non-logo images
+        if any(x in src.lower() for x in [
+            "icon", "sprite", "arrow", "loader",
+            "background", "banner", "decor"
+        ]):
+            continue
+
+        logos.append(img)
+
+    return logos
+
+
+# ----------------------------
+# 3️⃣ TIER DETECTION (LOGO-CENTRIC)
+# ----------------------------
+
+def find_tier_for_logo(img):
+    texts = []
+
+    # previous siblings
+    for sib in img.find_previous_siblings(limit=5):
+        texts.append(sib.get_text(" ", strip=True))
+
+    # next siblings
+    for sib in img.find_next_siblings(limit=5):
+        texts.append(sib.get_text(" ", strip=True))
+
+    # parent context
+    parent = img.parent
+    if parent:
+        texts.append(parent.get_text(" ", strip=True))
+
+        for sib in parent.find_previous_siblings(limit=3):
+            texts.append(sib.get_text(" ", strip=True))
+
+        for sib in parent.find_next_siblings(limit=3):
+            texts.append(sib.get_text(" ", strip=True))
+
+    for t in texts:
+        tier = sanitize_tier(t)
+        if tier:
+            return tier
+
+    return None
+
+
+# ----------------------------
+# 4️⃣ GROUP-BASED FALLBACK
+# ----------------------------
+
+def extract_group_based(soup, base_url):
     sponsors = []
-    imgs = container.find_all("img")
 
-    # Find a strong tier label first
-    tier = determine_tier(container, group_name)
+    for container in soup.find_all(["div", "section"]):
+        imgs = container.find_all("img")
+        if len(imgs) < 2:
+            continue
 
-    # Only treat the raw group label as tier if it *really looks like* one
-    if not tier and group_name and contains_tier_word(group_name):
-        tier = group_name
+        group_text = container.get_text(" ", strip=True)
+        group_tier = sanitize_tier(group_text)
 
-    for img in imgs:
-        name, confidence = resolve_brand_name(img, base_url)
-        
-        if confidence >= 0.9 and name: extraction_mtd = "alt"
-        elif confidence >= 0.75: extraction_mtd = "link_domain"
-        elif confidence >= 0.7: extraction_mtd = "filename"
-        else: extraction_mtd = "unknown"
+        for img in imgs:
+            name, confidence = resolve_brand_name(img, base_url)
+            if not name:
+                continue
 
-        if name:
             sponsors.append({
                 "name": name,
                 "confidence": confidence,
-                "group": tier,
-                "extraction_method": extraction_mtd,
+                "tier": group_tier,
                 "raw_text": img.get("alt") or name,
+                "source": "group",
             })
 
     return sponsors
 
-#full extraction function
+
+# ----------------------------
+# 5️⃣ MAIN ROBUST EXTRACTOR
+# ----------------------------
+
 def extract_sponsors_advanced(html, base_url):
-    groups = find_sponsor_groups(html)
-    all_sponsors = []
+    soup = BeautifulSoup(html, "lxml")
+    sponsors = []
 
-    for group in groups:
-        group_name = extract_group_label(group)
+    # 🔹 Strategy A: Logo-centric (primary, robust)
+    logos = extract_all_logos(soup, base_url)
 
-        sponsors = extract_sponsors_from_group(group, base_url, group_name) 
+    for img in logos:
+        name, confidence = resolve_brand_name(img, base_url)
+        if not name:
+            continue
 
-        all_sponsors.extend(sponsors)
+        tier = find_tier_for_logo(img)
 
-    return deduplicate(all_sponsors)
+        sponsors.append({
+            "name": name,
+            "confidence": confidence,
+            "tier": tier,
+            "raw_text": img.get("alt") or name,
+            "source": "logo",
+        })
 
+    # 🔹 Strategy B: Group-based fallback (older simple sites)
+    if len(sponsors) < 5:
+        sponsors.extend(extract_group_based(soup, base_url))
+
+    return deduplicate(sponsors)
+
+
+# ----------------------------
+# 6️⃣ SAFE DEDUPLICATION
+# ----------------------------
 
 def deduplicate(items):
     seen = {}
+
     for item in items:
-        key = item["name"].lower()
+        key = (
+            item["name"].lower(),
+            item.get("tier"),
+        )
+
         if key not in seen or seen[key]["confidence"] < item["confidence"]:
             seen[key] = item
-    return list(seen.values())
 
+    return list(seen.values())
