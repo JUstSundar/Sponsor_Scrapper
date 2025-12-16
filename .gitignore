@@ -1,0 +1,9 @@
+__pycache__/
+web_scrapper
+db/__pycache__
+db/create_tables.py
+extractor/__pycache__/
+pipeline/__pycache__/
+.env
+
+
