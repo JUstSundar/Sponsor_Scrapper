@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const baseUrl = process.env.REACT_APP_BACKEND_URL;
+
 const ScrapeForm = () => {
   const [festUrl, setFestUrl] = useState('');
   const [festName, setFestName] = useState('');
@@ -14,7 +16,7 @@ const ScrapeForm = () => {
     setResponse('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/scrape', {
+      const res = await fetch(baseUrl + '/api/scrape', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
