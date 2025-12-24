@@ -22,6 +22,7 @@ const ScrapeForm = () => {
         body: JSON.stringify({
           url: festUrl,
           fest_name: festName,
+          college: college,
           year: year,
         }),
       });
