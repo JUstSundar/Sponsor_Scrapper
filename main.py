@@ -13,6 +13,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {"message": "Sponsor Scraper API is running!"}
+
+
 class ScrapeRequest(BaseModel):
     url: str
     fest_name: str
