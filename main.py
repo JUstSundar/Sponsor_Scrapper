@@ -17,21 +17,23 @@ app.add_middleware(
 def read_root():
     return {"message": "Sponsor Scraper API is running!"}
 
-
 class ScrapeRequest(BaseModel):
     url: str
     fest_name: str
     college: str
     year: int
 
+from fastapi.concurrency import run_in_threadpool
+
 @app.post("/api/scrape")
 async def scrape_fest(data: ScrapeRequest):
     try:
-        run_fest_scrape(
-            fest_url=data.url,
-            fest_name=data.fest_name,
-            college=data.college,
-            year=data.year
+        await run_in_threadpool(
+            run_fest_scrape,
+            data.url,
+            data.fest_name,
+            data.college,
+            data.year
         )
         return {"message": "Scraping completed successfully!"}
     except Exception as e:
