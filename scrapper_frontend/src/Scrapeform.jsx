@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 
 const baseUrl = process.env.REACT_APP_BACKEND_URL;
 
@@ -16,22 +17,16 @@ const ScrapeForm = () => {
     setResponse('');
 
     try {
-      const res = await fetch(baseUrl + '/api/scrape', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: festUrl,
-          fest_name: festName,
-          college: college,
-          year: year,
-        }),
+      const res = await axios.post(`${baseUrl}/api/scrape`, {
+        url: festUrl,
+        fest_name: festName,
+        college: college,
+        year: year,
       });
 
-      const data = await res.json();
-      setResponse(data.message || JSON.stringify(data));
+      setResponse(res.data.message || JSON.stringify(res.data));
     } catch (err) {
+      console.error(err);
       setResponse('Error connecting to backend');
     } finally {
       setLoading(false);
@@ -48,34 +43,10 @@ const ScrapeForm = () => {
 
       <h2>Scrape Fest Sponsors</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', maxWidth: '400px' }}>
-        <input
-          type="text"
-          placeholder="Fest URL"
-          value={festUrl}
-          onChange={(e) => setFestUrl(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Fest Name"
-          value={festName}
-          onChange={(e) => setFestName(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="College"
-          value={college}
-          onChange={(e) => setCollege(e.target.value)}
-          required
-        />
-        <input
-          type="number"
-          placeholder="Year"
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          required
-        />
+        <input type="text" placeholder="Fest URL" value={festUrl} onChange={(e) => setFestUrl(e.target.value)} required />
+        <input type="text" placeholder="Fest Name" value={festName} onChange={(e) => setFestName(e.target.value)} required />
+        <input type="text" placeholder="College Name" value={college} onChange={(e) => setCollege(e.target.value)} required />
+        <input type="number" placeholder="Fest Year" value={year} onChange={(e) => setYear(e.target.value)} required />
         <button type="submit" disabled={loading} style={{ marginTop: '1rem' }}>
           {loading ? 'Scraping...' : 'Submit'}
         </button>
