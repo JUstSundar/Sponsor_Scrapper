@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const baseUrl = process.env.REACT_APP_BACKEND_URL;
+const baseUrl = "https://scrapper-backend-l28z.onrender.com";
+
+
 
 const ScrapeForm = () => {
   const [festUrl, setFestUrl] = useState('');
@@ -17,6 +19,8 @@ const ScrapeForm = () => {
     setResponse('');
 
     try {
+      console.log('POSTing to:', `${baseUrl}/api/scrape`);
+
       const res = await axios.post(`${baseUrl}/api/scrape`, {
         url: festUrl,
         fest_name: festName,
@@ -28,6 +32,7 @@ const ScrapeForm = () => {
     } catch (err) {
       console.error(err);
       setResponse('Error connecting to backend');
+
     } finally {
       setLoading(false);
     }
