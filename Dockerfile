@@ -1,27 +1,24 @@
-# ✅ Use official Playwright base image with Python
-FROM mcr.microsoft.com/playwright/python:v1.42.1-focal
+# ✅ Use the official Playwright image from GitHub Container Registry
+FROM ghcr.io/microsoft/playwright/python:v1.42.1-jammy
 
-# Set working directory
+# Set the working directory
 WORKDIR /app
 
-# Copy dependency files first
+# Copy dependencies
 COPY requirements.txt .
 
-# Install dependencies
+# Install Python dependencies
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Copy the rest of your app
+# Copy all files into the container
 COPY . .
 
-# Set environment variable so Playwright knows not to download again
-ENV PLAYWRIGHT_BROWSERS_PATH=0
-
-# Install browsers (important for production)
+# Install browsers
 RUN playwright install --with-deps
 
-# Expose the port (same as FastAPI)
+# Expose FastAPI's default port
 EXPOSE 10000
 
-# Start the FastAPI app
+# Run the app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
