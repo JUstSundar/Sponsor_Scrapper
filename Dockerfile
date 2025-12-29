@@ -1,5 +1,5 @@
 # Use official Playwright base with dependencies preinstalled
-FROM mcr.microsoft.com/playwright/python:v1.42.1-jammy
+FROM mcr.microsoft.com/playwright/python:v1.42.1-focal
 
 # Set working directory
 WORKDIR /app
