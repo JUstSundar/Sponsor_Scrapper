@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from pipeline.run import run_fest_scrape  
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 
 app = FastAPI()
 
@@ -23,18 +24,16 @@ class ScrapeRequest(BaseModel):
     college: str
     year: int
 
-from fastapi.concurrency import run_in_threadpool
-
 @app.post("/api/scrape")
-async def scrape_fest(data: ScrapeRequest):
+def scrape_fest(data: ScrapeRequest):
     try:
-        await run_in_threadpool(
-            run_fest_scrape,
-            data.url,
-            data.fest_name,
-            data.college,
-            data.year
+        run_fest_scrape(
+            fest_url=data.url,
+            fest_name=data.fest_name,
+            college=data.college,
+            year=data.year
         )
         return {"message": "Scraping completed successfully!"}
     except Exception as e:
         return {"error": str(e)}
+
