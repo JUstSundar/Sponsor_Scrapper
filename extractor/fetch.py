@@ -9,7 +9,7 @@ def fetch_html_js(url: str, timeout: int = 45000) -> str:
         #Launch browser
         browser = p.chromium.launch(
             headless=True,
-            args=["--disable-gpu", "--no-sandbox"],
+            args=["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
         )
 
         context = browser.new_context(

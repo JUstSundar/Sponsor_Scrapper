@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const baseUrl = "https://scrapper-backend-l28z.onrender.com";
+const baseUrl = "http://localhost:10000";
 
 
 
